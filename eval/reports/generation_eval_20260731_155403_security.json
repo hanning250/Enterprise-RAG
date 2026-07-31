@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-07-31T15:54:03",
+  "dataset_path": "eval/datasets/rag_eval.jsonl",
+  "sample_count": 4,
+  "security_metrics": {
+    "information_leak_rate": {
+      "ilr": 0.0,
+      "leak_count": 0,
+      "total_refusal_samples": 0
+    },
+    "unauthorized_hit_rate": {
+      "uhr": 0.0,
+      "unauthorized_hit_count": 0,
+      "total_risk_samples": 0
+    }
+  },
+  "security_report_text": "==== Enterprise Security Metrics ===\nInformation Leak Rate (ILR)    :  0.0%  (0/0)\nUnauthorized Hit Rate  (UHR)   :  0.0%  (0/0)\n===================================="
+}

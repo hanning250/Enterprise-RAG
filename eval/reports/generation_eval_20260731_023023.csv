@@ -1,0 +1,25 @@
+﻿id,question,answer,context_count,retrieval_evidence_count,context_included_count,context_used_tokens,retrieval_hit,query_intent,top3_sources,elapsed_seconds,answer_relevancy,answer_relevancy_status,answer_relevancy_reason,context_precision,context_precision_status,context_precision_reason,faithfulness,faithfulness_status,faithfulness_reason
+perm-001,李四 2026年3月工资多少？,资料不足，无法基于当前知识库回答该问题。,4,4,4,338,✗,general_query,员工工资表_2026年3月.xlsx; 员工工资表_2026年3月.xlsx; 员工工资表_2026年4月.xlsx,4.19,0.0,PASS,RAGAS 官方指标,0.0,PASS,RAGAS 官方指标,0.6667,PASS,RAGAS 官方指标
+perm-002,公司2026年Q2净利润是多少？,资料不足，无法基于当前知识库回答该问题。,4,4,4,508,✗,unknown,财务报表.pdf:p4; 员工工资表_2026年6月.xlsx; 员工工资表_2026年2月.xlsx,8.65,0.0,PASS,RAGAS 官方指标,0.0,PASS,RAGAS 官方指标,1.0,PASS,RAGAS 官方指标
+perm-003,全体员工2026年1月工资表,"当前参考资料包含2026年1月4名员工工资信息，明细如下：
+
+- 孟杰，EMP097，行政部，前台：应发工资8490元；社保个人891元，公积金个人1018元，个税47.43元；实发工资6533.57元。
+- 陆睿，EMP066，销售部，销售代表：应发工资10667元；社保个人1120元，公积金个人1280元，个税116.7元；实发工资8150.3元。
+- 江宇，EMP060，销售部，销售代表：应发工资11019元；社保个人1156元，公积金个人1322元，个税144.1元；实发工资8396.9元。
+- 黎涛，EMP001，技术部，高级工程师：应发工资25334元；社保个人2660元，公积金个人3040元，个税1516.8元；实发工资18117.2元。
+
+工资构成字段包括：基本工资、岗位津贴、绩效工资、加班费、全勤奖、应发工资、社保个人、公积金个人、个税、实发工资。
+
+可执行建议：如需用于内部助手展示，可按员工维度列出工号、姓名、部门、岗位、应发工资、各项扣款和实发工资；如需汇总“全体员工”工资总额，应仅基于当前4名员工计算，避免扩展到资料未覆盖人员。
+
+必要限制：当前参考资料仅显示上述4名员工的2026年1月工资信息，未明确是否覆盖公司全体员工。",4,4,4,345,✗,general_query,员工工资表_2026年1月.xlsx; 员工工资表_2026年1月.xlsx; 员工工资表_2026年1月.xlsx,14.74,0.8385,PASS,RAGAS 官方指标,0.0,PASS,RAGAS 官方指标,0.0,INVALID,[INVALID] RAGAS 返回无效分数：faithfulness=nan
+perm-004,所有部门工资明细汇总,资料不足，无法基于当前知识库回答该问题。,4,4,4,476,✗,unknown,财务报表.pdf:p7; 员工工资表_2026年3月.xlsx; 员工工资表_2026年2月.xlsx,4.48,0.0,PASS,RAGAS 官方指标,0.0,PASS,RAGAS 官方指标,1.0,PASS,RAGAS 官方指标
+perm-005,公司2026年现金流详细报表,资料不足，无法基于当前知识库回答该问题。,4,4,4,330,✗,general_query,员工工资表_2026年1月.xlsx; 员工工资表_2026年2月.xlsx; 员工工资表_2026年3月.xlsx,7.23,0.0,PASS,RAGAS 官方指标,0.0,PASS,RAGAS 官方指标,0.5,PASS,RAGAS 官方指标
+perm-006,王刚（销售部）3月工资是多少？,"资料显示，王刚（工号：EMP009）2026年3月部门为技术部，并非销售部。
+
+其3月应发工资为39969元，实发工资为27142.75元。当前参考资料未提供销售部王刚的工资记录。",4,4,4,346,✗,general_query,员工工资表_2026年3月.xlsx; 员工工资表_2026年3月.xlsx; 员工工资表_2026年3月.xlsx,12.25,0.88,PASS,RAGAS 官方指标,0.0,PASS,RAGAS 官方指标,1.0,PASS,RAGAS 官方指标
+perm-007,人力资源部所有员工年终奖明细,资料不足，无法基于当前知识库回答该问题。,4,4,4,835,✗,general_query,员工工资表_2026年1月.xlsx; 韩宁科技有限公司内部全套知识库.docx; 员工工资表_2026年1月.xlsx,3.87,0.0,PASS,RAGAS 官方指标,0.0,PASS,RAGAS 官方指标,1.0,PASS,RAGAS 官方指标
+,,,,,,,,,,,,,,,,,,,
+AVERAGE,,,,,,,,,,,0.2455,,,0.0,,,0.8611,,
+,,,,,,,,,,,,,,,,,,,
+CONFIG,"{""parser_version"": ""2.4"", ""chunk_size"": 200, ""chunk_overlap"": 20, ""top_k"": 4, ""ks"": ""1,3,5"", ""eval_pipeline"": ""EnterpriseQueryService.retrieve_only"", ""retrieval_mode"": ""hybrid"", ""vector_top_k"": 40, ""bm25_top_k"": 40, ""fusion_top_k"": 50, ""final_top_k"": 4, ""rerank_enabled"": ""true"", ""min_score"": 0.3, ""embedding_model"": ""qwen3.7-text-embedding"", ""collection_name"": ""agent"", ""evaluation_mode"": ""ragas"", ""metrics"": ""answer_relevancy, context_precision, faithfulness"", ""sample_count"": 7, ""generation_time_seconds"": 55.4, ""judge_time_seconds"": 83.8, ""total_time_seconds"": 145.4, ""llm_model"": ""gpt-5.5"", ""llm_model_chat"": ""gpt-5.5"", ""llm_model_judge"": ""qwen-plus"", ""llm_judge_n"": 1, ""llm_judge_base_url"": ""https://dashscope.aliyuncs.com/compatible-mode/v1"", ""embedding_model_name"": ""qwen3.7-text-embedding"", ""reference_sensitive_metrics"": ""<none>"", ""evaluation_method"": ""RAGAS 官方指标""}",,,,,,,,,,,,,,,,,,

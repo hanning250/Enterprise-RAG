@@ -1,0 +1,258 @@
+embedding_model_name: qwen3.7-text-embedding
+
+# LLM 大语言模型配置（新增）
+llm:
+  # 模型名称（与 chat_model_name 一致，便于新代码统一从 llm 下读取）
+  model_name: gpt-5.5
+  # 模型上下文窗口大小（token 数上限）
+  # gpt-5.5 官方支持 128k 上下文窗口，此处作为预算上限参考
+  context_window: 128000
+  # 模型输出最大 token 数（防止模型输出过长，挤占输入空间）
+  # 设置为 2048，足以覆盖制度/工资类结构化回答
+  max_output_tokens: 2048
+  # 单次总结 HTTP 超时（秒）；超时后走空答/资料不足，避免前端一直转圈
+  timeout_seconds: 90
+  # 失败重试次数（过大时网关卡死会把等待时间翻倍）
+  max_retries: 1
+
+  # ===== Judge LLM 配置（RAGAS 成质量评估专用，独立于线上 chat_model）=====
+  # 注意：
+  #   - 鉴权完全复用 .env 中的 DASHSCOPE_API_KEY 和 DASHSCOPE_BASE_URL，
+  #     不再新增新的 key 环境变量；
+  #   - P1 #2 修复：judge_model_name **必须显式填**，不再有 "空就 fallback 到 llm.model_name"
+  #     的自动降级（否则如果线上用 OPENAI_BASE_URL 下的 gpt-5.5，会把 gpt-5.5 发到 DashScope
+  #     → model_not_found → 静默 0 分，极难排查）。
+  judge_llm:
+    # Judge 专用模型名。大模型做评估通常用更大、更稳定的 base/instruct 模型。
+    # 常见选择：
+    #   - qwen3-235b-a22b-instruct-2507（235B 大模型，评估建议）
+    #   - qwen-max
+    judge_model_name: qwen-plus
+
+    # Judge 单条输出最大 token 数（RAGAS faithfulness 要抽取 statements + 逐条判定，
+    # 但实际返回是结构化短 JSON；2048 足够覆盖复杂样本，同时能显著降低慢请求尾延迟）
+    max_output_tokens: 2048
+
+    # 评估要"尽量确定"，默认 0.0（不做 creative sampling）。
+    # 仅在你要验证"鲁棒性"时改成 0.2~0.5，不要超过 1.0。
+    temperature: 0.0
+
+    # RAGAS metric 的 `n` 参数：self-consistency 要求模型对同一个 prompt 出 n 条候选
+    # 再投票。但国内绝大多数 OpenAI 兼容 provider（DashScope / Maas 网关 / SiliconFlow 等）
+    # **实际不会按 `n>1` 真的出多条**，只会返回 1 条 generation。
+    #
+    # 我们的包装器会做"补齐克隆"：如果 provider 只返回 1 条，就复制 n 份交给 ragas，
+    # 让 ragas 的 self-consistency 代码路径不警告、也不报错。但"复制同一份"数学上
+    # 等价于 n=1，不是真的多数投票。
+    #
+    # 所以：
+    #   - 默认填 1：诚实模式，不装多样本。评分更快、token 更少。
+    #   - 填 3/5 仅用于验证"代码路径是否能处理 n>1"，或验证 ragas 行为差异。
+    #     此时不要和 n=1 的 run 做 A/B 对比，因为实际没有真实多样本。
+    judge_n: 1
+
+# 进程内分层缓存（不上 Redis；多进程需各自一份或外置共享）
+cache:
+  qa:
+    enabled: true
+    max_entries: 256
+    # 问答结果 TTL（秒）；知识库 build 时会整表清空
+    ttl_seconds: 600
+  bm25:
+    # BM25 索引本身已缓存在进程内存；入库/热删除后强制 rebuild
+    rebuild_on_ingest: true
+
+# RAG 检索增强生成配置（新增）
+rag:
+  # RAG 上下文拼接最大 token 预算（所有参考资料加起来不能超过此值）
+  # 计算公式：可用上下文 ≈ context_window - 系统提示词 - 用户输入 - max_output_tokens
+  # 保守设置为 12000 tokens，约等于 1.5~2 万字的参考资料
+  max_context_tokens: 12000
+  # 检索返回的文档数量上限（优先级：先按 top_k 检索，再按 max_context_tokens 裁剪）
+  # 注意：如果配置了下面 retrieval.final_top_k，则以 final_top_k 为准（更细粒度）
+  top_k: 4
+
+# ===== 新增：Hybrid Recall + Rerank 全链路配置 =====
+# 参考计划书「配置设计」章节，每个字段都有默认值，修改时请同步参考各模块注释
+
+# 检索层（双路召回 + 截断控制）
+retrieval:
+  # 检索模式：
+  #   - "hybrid" : BM25 关键词 + 向量语义 双路召回 → 融合 → 重排（推荐）
+  #   - "vector" : 仅向量语义单路召回（旧版行为，兼容回退）
+  #   - "bm25"   : 仅 BM25 关键词单路召回（调试用）
+  mode: hybrid
+  # 向量召回的粗池大小（原 20 → 40：放松入口，给冷门 section / 操作提示段更多进 rerank 的机会）
+  vector_top_k: 40
+  # BM25 关键词召回的粗池大小（原 20 → 40："预约 / 步骤 / 怎么操作"这类稀有关键词更易命中）
+  bm25_top_k: 40
+  # 融合后送给 Rerank API 的候选数上限（原 30 → 50：Rerank 侧"巧妇有米下锅"）
+  fusion_top_k: 50
+  # ScoreGuard 最终输出的候选数上限（原 4 → 6：给 LLM 多 2 段上下文预算，context_count 目标从 1 提到 2~3）
+  final_top_k: 4
+
+# BM25 关键词召回
+bm25:
+  # 是否启用 BM25（设为 false 时，hybrid 模式下会自动退化为 vector 单路）
+  enabled: true
+  # 分词器名称：第一版仅支持 "jieba"（中文友好，零配置可用）
+  tokenizer: jieba
+
+# 候选融合策略
+fusion:
+  # 融合方法：第一版仅支持 "rrf"（Reciprocal Rank Fusion，倒数排名融合）
+  method: rrf
+  # RRF 公式中的平滑系数 k（业界经验值 60，越小越强调排名靠前的候选）
+  rrf_k: 60
+
+# API Rerank（重排）
+rerank:
+  # 是否启用 Rerank（设为 false 时，链路会跳过 Rerank，直接送融合结果给 ScoreGuard）
+  enabled: true
+  # 供应商标识：目前仅支持通用 HTTP 适配器 "api"
+  # 预留扩展：未来可加 "dashscope" / "jina" / "cohere" 等厂商专用适配
+  provider: dashscope
+  # API Key 来源的环境变量名（不要把密钥直接写在 YAML 里！）
+  #   - 默认：DASHSCOPE_API_KEY（和后端 LLM/Embedding 共用同一个 DashScope 密钥）
+  #          绝大多数场景不用改，直接复用同一个 Key 最省心。
+  #   - 只有当你想让 Rerank 走独立的子账号 Key（不同额度/不同项目）时，才改成：
+  #          api_key_env: RERANK_API_KEY
+  #     然后在环境变量里分别设置 DASHSCOPE_API_KEY 和 RERANK_API_KEY 两个不同值。
+  # 注意：代码里不再做"api_key_env 没读到就兜底 DASHSCOPE_API_KEY"的二次逻辑；
+  #      这里设置了什么环境变量名，就严格读那个，避免想分 Key 时被偷偷串号。
+  api_key_env: DASHSCOPE_API_KEY
+  # Rerank 模型名称（DashScope 额度列表显示的名字，一字不差）
+  # 当前：qwen3-vl-rerank（账号免费额度内唯一可用的 rerank 模型）
+  # 纯文本场景若额度开放，可改回 qwen3-rerank；通用备选 bge-reranker-v2-m3 / gte-rerank-v2
+  model: qwen3-vl-rerank
+  # Rerank API 返回的 top_n（内部再次裁剪，≤ retrieval.final_top_k 即可）
+  top_k: 50
+  # 相关性最小阈值：由 ScoreGuard 读取（rerank.min_score 或 score_guard.min_score）
+  # 起步值建议：
+  #   qwen3-vl-rerank / qwen3-rerank : 0.30 起步
+  #   bge-reranker-v2-m3             : 0.35 起步
+  #   gte-rerank-v2                  : 0.10 起步（中文表格场景打分偏低）
+  # 后续请用真实 query 调参：过高会导致命中太少，过低会保留弱相关噪音
+  min_score: 0.30
+  # HTTP 请求超时（秒）：防止 API 慢导致用户等待太久
+  timeout_seconds: 20
+  # 失败兜底开关：
+  #   - true  : Rerank API 报错/超时/配置缺失时，自动回退到 RRF 融合顺序（不影响用户体验，推荐）
+  #   - false : 任何异常直接抛错，让工具健康检查暴露问题（仅测试/调试用）
+  fail_open: true
+
+# ContextExpander：命中 fine chunk 后，补全对应 parent section 给 LLM 做上下文完整化（防止细粒 chunk 漏答）
+context_expansion:
+  # 总开关：true=开启，false=关闭（直接返回检索命中的 fine chunk，不补全 parent）
+  enabled: true
+  # 是否把 fine chunk 替换成 parent section（推荐 true，避免"命中的短句 + parent 的整节"冗余重复进预算）
+  include_parent: true
+  # 单条 parent section 的最大 token 预算上限；超过就不补（避免整节过长挤占预算）
+  max_parent_tokens: 800
+  # 【可选】单条 parent section 的最大字符预算上限；超过就不补。不写=只按 tokens 判断。
+  # 如果你觉得「补全后的上下文还是过宽」，可以把这个值从默认 900 再往下降（比如 600）
+  # 这样 section 超长时就直接不补，退回原始 fine chunk（200 字小片段），进一步收紧上下文
+  # max_parent_chars: 900
+  # ===== 新增：步骤型问题的「相邻 section 额外补全」开关 =====
+  # 对 "怎么预约 / 怎么做 / 步骤 / 流程 / 操作指南" 这类步骤型问题（关键词触发），
+  # 在完成 parent section 补全后，再额外追加同一文档里 page 相邻的 1~2 个 section
+  # （例如「报销流程」section 之后，相邻 section 可能含审批节点/材料清单）
+  procedural_extra_enable: true
+  # 识别为步骤型问题的关键词（命中任意 1 个即生效，支持中文/英文）
+  procedural_keywords:
+    - "怎么"
+    - "如何"
+    - "步骤"
+    - "流程"
+    - "操作"
+    - "做法"
+    - "指南"
+    - "申请"
+    - "审批"
+    - "how to"
+    - "steps"
+  # 步骤型问题每个 parent 最多额外补几个相邻 section（1~2 推荐；太多会开始污染 precision）
+  procedural_extra_max_sections: 2
+  # 额外补的 section 单条 token 上限（超过就跳过，省预算）
+  procedural_extra_max_tokens: 900
+
+# 检索后处理（Answerability 回答价值过滤 + ContextCompressor 上下文压缩）
+# Answerability / ContextCompressor：企业场景下意图为 general，不做旅游域字段裁剪；
+# compressor 仅对超长片段按 compressor_max_kept_tokens 截断。
+post_retrieval:
+  # Answerability：预留开关；当前 general 意图下原样放行候选
+  answerability_enabled: true
+  # 未通过 answerability 时的 rerank_score 惩罚系数（企业规则落地后生效）
+  answerability_fail_penalty: 0.12
+  # ContextCompressor：开启后仅做超长 token 截断
+  compressor_enabled: true
+  # 单条 candidate 的最大保留 token 数（超过就按行截断）
+  compressor_max_kept_tokens: 1200
+
+# ScoreGuard：相关性阈值过滤 + 兜底策略（可选，不写则用默认值）
+score_guard:
+  # 可单独覆盖；不写则复用 rerank.min_score
+  # 与 qwen3-vl-rerank 对齐：0.30；过滤后为空则 fallback_rrf 保底出前 N。
+  min_score: 0.30
+
+  # 过滤后为空时的兜底策略：
+  #   - "empty_safe"   : 直接返回空（安全，LLM 会回复资料不足，避免幻觉，推荐第一版默认）
+  #   - "fallback_rrf" : 回退 RRF 融合分前 N 条，并打低置信标记（宁可给低质量答案也不空手回）
+  strategy: fallback_rrf
+
+  # fallback_rrf 策略下回退几条（默认 3）
+  fallback_count: 5
+
+# ===== 新增：数据清洗四层质量门（L1 Document → L2 Chunker → L3 Chunk → L4 QualityReport） =====
+# 所有阈值默认都是保守值，中文 RAG 公开数据集实测合理；
+# 如果你的文档本身特别短/是提纲类，可以放松：l1_page_min_chars 降到 20 / l3_density_min_cjk_chars 降到 5
+data_cleaning:
+  # L1：Document 级清洗（整页/整文档丢弃 + 全局重复行降噪）
+  l1_enable: true
+  # 同一文档里重复出现的行占比 >= 该阈值 -> 判定为页眉页脚/免责声明行，所有页面全行删除
+  l1_global_repeat_row_ratio: 0.60
+  # 单页命中 TOC/目录正则 >= 该行数 -> 判定为目录页，整页 Document 丢弃
+  l1_toc_min_lines: 5
+  # 整页中「OCR 乱码 + CJK 私有区 + 不可打印字符」占比 > 该值 -> 整页丢弃
+  l1_garbage_char_ratio_max: 0.03
+  # 清洗后整页字符数（纯 CJK+ASCII 字母数字，不含空白/符号）低于该值 -> 整页丢弃
+  l1_page_min_chars: 10
+  # 单行免责声明/版权黑名单命中（命中且该行 < 200 字则删行）
+  l1_blacklist_lines:
+    - "版权所有"
+    - "©"
+    - "仅供参考"
+    - "不构成任何"
+    - "confidential"
+    - "internal use only"
+    - "保密"
+
+  # L2：切分层噪声清理（在 semantic_chunker 的 section_buffer 入队前生效）
+  l2_enable: true
+  # 剥离 Markdown 装饰线 / 连续符号行（--- *** ### ...）
+  l2_strip_md_decor: true
+  # 剥离"见第 X 节 / 参考附件 X"这类纯指引行（本身无实质内容）
+  l2_strip_ref_directives: true
+
+  # L3：Chunk 级清洗（切分之后、bind_chunk_metadata 之前生效）
+  l3_enable: true
+  # 信息密度：CJK 字符数 + 占比双门槛（任一组合满足即放行）
+  l3_density_min_cjk_chars: 3
+  l3_density_min_cjk_ratio: 0.10
+  # 纯英文文档用 ASCII 词数门槛（\b\w+\b 切词）
+  l3_density_min_ascii_words: 2
+  # 精确去重（按 chunk_hash 完全相同）：重复出现的 chunk 合并为第一条，metadata 写 dedupe_ref_count
+  l3_exact_dedup: true
+  # 近似去重（64bit SimHash Hamming 距离 <= 阈值判重复）：保留内容更长的那条
+  l3_simhash_dedup: true
+  l3_simhash_hamming_max: 1
+  # Markdown 表格 chunk 必须至少包含 1 条数据行（否则只是纯表头副本空壳）
+  l3_table_require_data_rows: 1
+
+  # L4：入库质量门 QualityReport（告警阈值，不中断入库 fail-open）
+  # 保留率 kept / (kept + dropped) < 该值 -> logger.warn
+  l4_kept_ratio_warn: 0.30
+  # 去重占比 dedup_exact + dedup_simhash / 原始 chunk 数 > 该值 -> logger.warn（提示文档集内部冗余高）
+  l4_dedup_ratio_warn: 0.60
+  # 每个保留 chunk 的 metadata 是否写入 quality_score + cleaning_reasons（以后检索端可 where quality_score >= 50 二次过滤）
+  report_to_metadata: true

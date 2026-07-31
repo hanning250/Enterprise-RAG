@@ -1,0 +1,32 @@
+﻿id,question,answer,context_count,retrieval_evidence_count,context_included_count,context_used_tokens,retrieval_hit,query_intent,top3_sources,elapsed_seconds,answer_relevancy,answer_relevancy_status,answer_relevancy_reason,context_precision,context_precision_status,context_precision_reason,faithfulness,faithfulness_status,faithfulness_reason
+table-001,王刚2026年3月 个税扣多少？,"王刚2026年3月应缴个税为3834.25元。
+
+（注：以上内容仅供参考，具体执行以公司 HR 部门正式文件为准）",4,4,4,347,✓,general_query,员工工资表_2026年3月.xlsx; 员工工资表_2026年2月.xlsx; 员工工资表_2026年1月.xlsx,4.37,0.0,PASS,RAGAS 官方指标,1.0,PASS,RAGAS 官方指标,0.3333,PASS,RAGAS 官方指标
+table-002,龚一诺2026年1月社保公积金合计多少？,"龚一诺2026年1月社保公积金合计为8646元。
+
+关键事实：
+- 社保（个人）：4035元
+- 公积金（个人）：4611元
+- 合计：4035 + 4611 = 8646元
+
+该金额仅对应2026年1月工资表中的个人社保和个人公积金。
+
+（注：以上内容仅供参考，具体执行以公司 HR 部门正式文件为准）",4,4,4,352,✓,general_query,员工工资表_2026年1月.xlsx; 员工工资表_2026年2月.xlsx; 员工工资表_2026年4月.xlsx,5.48,0.9754,PASS,RAGAS 官方指标,0.0,PASS,RAGAS 官方指标,0.7143,PASS,RAGAS 官方指标
+table-003,2026年5月龚一诺的应发工资组成,"龚一诺2026年5月应发工资为42746元，组成如下：
+
+- 基本工资：27800元
+- 岗位津贴：4687元
+- 绩效工资：8019元
+- 加班费：1940元
+- 全勤奖：300元
+
+以上项目合计为42746元。扣除项和实发工资不属于应发工资组成；资料显示其5月社保个人4488元、公积金个人5129元、个税4372.25元，实发工资28756.75元。
+
+（注：以上内容仅供参考，具体执行以公司 HR 部门正式文件为准）",4,4,4,353,✓,general_query,员工工资表_2026年5月.xlsx; 员工工资表_2026年4月.xlsx; 员工工资表_2026年3月.xlsx,6.44,0.0,PASS,RAGAS 官方指标,1.0,PASS,RAGAS 官方指标,0.8571,PASS,RAGAS 官方指标
+table-004,2026年Q1 营业收入是多少？,"资料不足，无法基于当前知识库回答该问题。
+
+（注：以上内容仅供参考，具体执行以公司 HR 部门正式文件为准）",4,4,4,336,✓,time_query,员工工资表_2026年1月.xlsx; 员工工资表_2026年3月.xlsx; 员工工资表_2026年1月.xlsx,13.95,0.0,PASS,RAGAS 官方指标,0.0,PASS,RAGAS 官方指标,0.4,PASS,RAGAS 官方指标
+,,,,,,,,,,,,,,,,,,,
+AVERAGE,,,,,,,,,,,0.2438,,,0.5,,,0.5762,,
+,,,,,,,,,,,,,,,,,,,
+CONFIG,"{""parser_version"": ""2.4"", ""chunk_size"": 200, ""chunk_overlap"": 20, ""top_k"": 4, ""ks"": ""1,3,5"", ""eval_pipeline"": ""EnterpriseQueryService.retrieve_only"", ""retrieval_mode"": ""hybrid"", ""vector_top_k"": 40, ""bm25_top_k"": 40, ""fusion_top_k"": 50, ""final_top_k"": 4, ""rerank_enabled"": ""true"", ""min_score"": 0.3, ""embedding_model"": ""qwen3.7-text-embedding"", ""collection_name"": ""agent"", ""evaluation_mode"": ""ragas"", ""metrics"": ""answer_relevancy, context_precision, faithfulness"", ""sample_count"": 4, ""generation_time_seconds"": 30.3, ""judge_time_seconds"": 81.6, ""total_time_seconds"": 115.1, ""llm_model"": ""gpt-5.5"", ""llm_model_chat"": ""gpt-5.5"", ""llm_model_judge"": ""qwen-plus"", ""llm_judge_n"": 1, ""llm_judge_base_url"": ""https://dashscope.aliyuncs.com/compatible-mode/v1"", ""embedding_model_name"": ""qwen3.7-text-embedding"", ""reference_sensitive_metrics"": ""<none>"", ""evaluation_method"": ""RAGAS 官方指标""}",,,,,,,,,,,,,,,,,,

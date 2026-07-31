@@ -1,0 +1,56 @@
+collection_name : agent
+persist_directory : chroma_db
+k :  3
+data_path : data
+# RAG 文档注册表 SQLite 路径（存放 content_hash / 分片版本 / embedding 版本等信息）
+registry_db_path : data/rag_document_registry.sqlite3
+allow_knowledge_file_type : ["txt","pdf","md","markdown","doc","docx","xlsx","xls"]
+
+# 切分模式（切分粒度架构）：
+#   - "recursive"  : 旧版单级 RecursiveCharacterTextSplitter（单粒度，无父子 chunk）
+#   - "hierarchical": 新版父子两级语义切分（细粒 200 字符检索 + 粗粒 900 字符上下文补全）
+chunking_mode : hierarchical
+
+# 旧版 recursive 模式（chunking_mode="recursive" 时生效，作为回退）：
+chunk_size : 200
+chunk_overlap : 20
+separators : ["\n\n","。",".","?","？","!"," ",""]
+
+# 新版 hierarchical 模式（chunking_mode="hierarchical" 时生效，按你说的细粒=300 / 粗粒=900）：
+hierarchical:
+  # 细粒（Fine Chunk）：实际入库参与向量召回的 chunk，等价 300 字符 ≈ 300 tokens
+  max_fine_chars: 300
+  # 粗粒（Section / Parent Chunk）：命中后通过 ContextExpander 补全给 LLM 的整节，等价 900 字符 ≈ 900 tokens
+  max_section_chars: 900
+  # 粗粒超过 max_section_chars 时，是否允许再切分成多个 section_part（推荐 true，否则极长篇 FAQ 会被硬砍或超预算）
+  allow_section_partition: true
+
+# VLM PDF 解析配置（使用云端视觉大模型提取 PDF 文本）
+vlm:
+  # VLM 模型名称（DashScope 通义千问视觉模型）
+  #   qwen-vl-ocr-latest   : 专门做 OCR 文字提取，精准度高V
+  #   qwen-vl-plus  : 通用视觉理解，版面结构识别更好
+  model_name: qwen-vl-ocr-latest
+  # 生成细节程度（detailed=详细，concise=简洁）
+  detail_level: detailed
+  # API 地址（默认跟 embedding 同一个 MaaS 兼容地址，由 .env 中的 DASHSCOPE_BASE_URL 提供）
+  base_url: ${DASHSCOPE_BASE_URL}
+
+# 解析器版本号：修改 PDF/TXT/MD/DOCX 加载逻辑时同步升级
+# 1.0 → 1.1：PDF 加载新增 OCR 回退（扫描版 PDF 由 PaddleOCR 识别文字）
+# 1.1 → 1.2：回退升级为 PP-Structure 版面分析（支持图文混排/表格/双栏）
+# 1.2 → 1.3：修复 fitz.open password；双栏阅读顺序；固定使用 PP-Structure 解析 PDF
+# 1.3 → 1.4：新增 VLM 视觉解析方案
+# 1.4 → 2.0：彻底移除 PP-Structure，全面切换为 VLM+OCR 方案
+# 2.0 → 2.1：【方案 A】新增纯无文字图兜底：prompt 要求 VLM 输出【图描述-P<页>-<号>】；
+#            page_text 过短时自动二次跑 describe prompt 强制视觉描述，避免整页纯图消失
+# 2.1 → 2.2：【Phase1】allow_file_type 新增 md/markdown/doc/docx；新增 md_loader
+# 2.2 → 2.3：【数据清洗四层质量门】L1 Document 级（全局重复行/TOC整页丢弃/乱码比/密度兜底）+
+#            L2 切分层噪声清理（装饰线/指引行剥离）+ L3 Chunk 级（密度阈值/精确去重/SimHash 近似去重）+
+#            L4 入库 QualityReport + metadata quality_score，parser_version 升级强制重新清洗入库
+# 2.3 → 2.4：落地 docx_loader/xlsx_loader，新增业务 metadata（doc_type/sensitivity_level/owner_role），触发存量文档重新入库
+parser_version : "2.4"
+
+# embedding 版本号：更换 embedding 计算方式时同步升级
+embedding_version : "1.0"
+

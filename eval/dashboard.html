@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RAG 评估可视化面板 · Evaluation Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a;
+    --bg-soft: #111c34;
+    --card: #16223c;
+    --border: #273353;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #6366f1;
+    --accent-2: #22d3ee;
+    --ok: #22c55e;
+    --warn: #f59e0b;
+    --bad: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(180deg, #0b1120 0%, var(--bg) 100%);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    padding: 24px 32px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  header h1 .sub {
+    color: var(--text-dim);
+    font-weight: 400;
+    font-size: 14px;
+    margin-left: 10px;
+  }
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .toolbar button, .toolbar select {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .toolbar button:hover, .toolbar select:hover {
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .toolbar button.primary {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+    color: #fff;
+    border: none;
+    font-weight: 600;
+  }
+  main {
+    padding: 20px 32px 60px;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 1100px) {
+    main { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset;
+  }
+  .card h2 {
+    margin: 0 0 14px 0;
+    font-size: 15px;
+    color: var(--text-dim);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat .label { font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+  .stat .value { font-size: 22px; font-weight: 700; color: var(--text); }
+  .stat .foot { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+  .chart-wrap { position: relative; height: 320px; }
+  .table-wrap { overflow-x: auto; margin-top: 4px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead th {
+    text-align: left;
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 12px;
+    padding: 10px 12px;
+    background: var(--bg-soft);
+    position: sticky; top: 0;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: top;
+  }
+  tbody tr.selected {
+    background: rgba(99,102,241,0.12);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  tbody tr:hover { background: rgba(255,255,255,0.03); cursor: pointer; }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-right: 4px;
+    border: 1px solid var(--border);
+    background: var(--bg-soft);
+  }
+  .tag.retrieval { color: #a5b4fc; border-color: rgba(99,102,241,0.5); background: rgba(99,102,241,0.1); }
+  .tag.generation { color: #67e8f9; border-color: rgba(34,211,238,0.5); background: rgba(34,211,238,0.1); }
+  .hash-code {
+    font-family: "JetBrains Mono", Consolas, Menlo, monospace;
+    font-size: 12px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent-2);
+  }
+  .params-box {
+    font-family: "JetBrains Mono", Consolas, Menlo, monospace;
+    font-size: 12px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    padding: 12px;
+    border-radius: 8px;
+    max-height: 280px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #cbd5e1;
+  }
+  .metric-chip {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 8px 12px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-width: 110px;
+  }
+  .metric-chip .k { font-size: 11px; color: var(--text-dim); }
+  .metric-chip .v { font-size: 16px; font-weight: 700; color: var(--text); }
+  .metric-chip .s { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+  .metrics-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .runs-table { margin-top: 8px; }
+  .btn-compare {
+    border: 1px dashed var(--accent);
+    background: rgba(99,102,241,0.1);
+    color: var(--accent-2);
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: auto;
+  }
+  .btn-compare.active {
+    background: var(--accent);
+    color: #fff;
+    border-style: solid;
+  }
+  .row-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+  .empty strong { color: var(--text); display: block; margin-bottom: 6px; }
+  .delta-up { color: var(--ok); font-weight: 700; }
+  .delta-down { color: var(--bad); font-weight: 700; }
+  .delta-flat { color: var(--text-dim); }
+  a { color: var(--accent-2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🧪 RAG 评估可视化面板 <span class="sub">/eval 页面 · 数据来自 eval/reports/_experiment_registry.json</span></h1>
+  </div>
+  <div class="toolbar">
+    <select id="filter-type">
+      <option value="">全部实验</option>
+      <option value="retrieval">仅检索评估</option>
+      <option value="generation">仅生成评估</option>
+    </select>
+    <select id="filter-limit">
+      <option value="20">最近 20 条</option>
+      <option value="50" selected>最近 50 条</option>
+      <option value="100">最近 100 条</option>
+      <option value="200">最近 200 条</option>
+    </select>
+    <button id="btn-refresh">🔄 刷新</button>
+    <button id="btn-compare-mode" title="进入对比模式：勾选 2~4 个实验后查看">⚖️ 对比模式</button>
+    <button id="btn-export" class="primary">⬇️ 导出 JSON</button>
+  </div>
+</header>
+
+<main>
+  <!-- 左列：实验列表 -->
+  <section>
+    <div class="card">
+      <h2>实验列表</h2>
+      <div id="compare-tip" style="display:none; margin-bottom:10px; padding:10px 12px; background:rgba(99,102,241,0.1); border:1px dashed var(--accent); border-radius:8px; font-size:13px;">
+        已进入对比模式：点击表格行勾选 <span id="compare-count">0</span>/4，完成后点「开始对比」。
+        <button id="btn-do-compare" style="margin-left:10px; background:var(--accent); color:#fff; border:none; padding:4px 10px; border-radius:6px; cursor:pointer;">开始对比</button>
+        <button id="btn-compare-clear" style="margin-left:6px; background:transparent; color:var(--text-dim); border:1px solid var(--border); padding:4px 10px; border-radius:6px; cursor:pointer;">清空</button>
+      </div>
+      <div class="table-wrap" style="max-height:70vh;">
+        <table id="exp-table">
+          <thead>
+            <tr>
+              <th style="width:28px;">#</th>
+              <th>params_hash</th>
+              <th>类型</th>
+              <th>运行次数</th>
+              <th>最近运行</th>
+            </tr>
+          </thead>
+          <tbody id="exp-tbody">
+            <tr><td colspan="5" class="empty"><strong>加载中...</strong> 请稍候</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右列：统计 + 详情 -->
+  <section>
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat"><div class="label">总实验数</div><div class="value" id="s-total">-</div><div class="foot">唯一参数版本数</div></div>
+      <div class="stat"><div class="label">检索评估</div><div class="value" id="s-ret">-</div><div class="foot">retrieval type</div></div>
+      <div class="stat"><div class="label">生成评估</div><div class="value" id="s-gen">-</div><div class="foot">generation type</div></div>
+      <div class="stat"><div class="label">总运行次数</div><div class="value" id="s-runs">-</div><div class="foot">各版本 × 多次 run 之和</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px;">
+      <h2>核心指标趋势（按时间排序）</h2>
+      <div class="chart-wrap"><canvas id="trend-chart"></canvas></div>
+    </div>
+
+    <div class="card" id="detail-card">
+      <div class="row-header">
+        <h2 style="margin:0;">实验详情</h2>
+        <span class="pill" id="detail-hash" style="display:none;">未选中</span>
+      </div>
+      <div id="detail-empty" class="empty">
+        <strong>👈 点击左侧列表中的实验查看详情</strong>
+        或者在对比模式中勾选 2~4 个实验做 A/B 对照。
+      </div>
+      <div id="detail-content" style="display:none;">
+        <div id="detail-meta" style="margin-bottom:16px;"></div>
+        <div style="margin:14px 0 8px; font-size:13px; color:var(--text-dim);">📊 聚合指标（多次 run 统计）</div>
+        <div class="metrics-grid" id="detail-metrics"></div>
+        <div style="margin:18px 0 8px; font-size:13px; color:var(--text-dim);">🧾 配置参数快照</div>
+        <div class="params-box" id="detail-params"></div>
+        <div style="margin:18px 0 8px; font-size:13px; color:var(--text-dim);">🗂️ 历史 runs（最近 10 条）</div>
+        <div class="table-wrap runs-table">
+          <table>
+            <thead><tr><th>run_id (后 16 位)</th><th>运行时间</th><th>耗时</th><th>样本</th><th>报告</th></tr></thead>
+            <tbody id="detail-runs"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 对比视图 -->
+      <div id="compare-content" style="display:none;">
+        <div id="compare-summary" style="margin-bottom:16px;"></div>
+        <div style="margin:14px 0 8px; font-size:13px; color:var(--text-dim);">📈 指标雷达对比（数值越大越好，若有 std 会在 hover 中展示）</div>
+        <div class="chart-wrap"><canvas id="compare-chart"></canvas></div>
+        <div style="margin:18px 0 8px; font-size:13px; color:var(--text-dim);">🔢 指标对照表（相对第一个勾选实验的 Δ%）</div>
+        <div class="table-wrap">
+          <table id="compare-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+let state = {
+  all: [],                // 当前过滤后的实验列表
+  selectedHash: null,     // 当前选中的 params_hash
+  compareMode: false,     // 是否进入对比模式
+  compareSet: new Set(),  // 对比模式勾选的 hashes
+};
+
+let trendChart = null;
+let compareChart = null;
+
+async function fetchExperiments() {
+  const type = $("filter-type").value || undefined;
+  const limit = parseInt($("filter-limit").value, 10) || 50;
+  const url = new URL("/api/eval/experiments", window.location.origin);
+  if (type) url.searchParams.set("type", type);
+  url.searchParams.set("limit", String(limit));
+  const resp = await fetch(url.toString());
+  if (!resp.ok) throw new Error("加载失败：" + resp.status);
+  return (await resp.json()).items || [];
+}
+
+async function fetchExperiment(hash) {
+  const resp = await fetch(`/api/eval/experiments/${encodeURIComponent(hash)}`);
+  if (!resp.ok) throw new Error("加载详情失败：" + resp.status);
+  return resp.json();
+}
+
+async function fetchCompare(hashes) {
+  const url = new URL("/api/eval/compare", window.location.origin);
+  url.searchParams.set("hashes", hashes.join(","));
+  const resp = await fetch(url.toString());
+  if (!resp.ok) throw new Error("对比失败：" + resp.status);
+  return (await resp.json()).rows || [];
+}
+
+function fmtNum(v, digits = 4) {
+  if (v === null || v === undefined || Number.isNaN(v)) return "-";
+  if (typeof v !== "number") return String(v);
+  if (Math.abs(v) < 0.0001 && v !== 0) return v.toExponential(2);
+  return v.toFixed(digits);
+}
+
+function shortHash(h) {
+  return typeof h === "string" ? h.slice(0, 10) + "…" : "";
+}
+
+function shortRunId(id) {
+  if (!id) return "-";
+  return id.length > 16 ? "…" + id.slice(-16) : id;
+}
+
+function reportFileLink(files) {
+  if (!files) return "-";
+  const items = [];
+  const absToRel = (p) => {
+    // 后端把 reports 目录挂在 /eval/reports 下，我们只取文件名
+    if (!p) return "";
+    const m = String(p).match(/[\\/]([^\\/]+\.(?:csv|md|json))$/i);
+    return m ? m[1] : "";
+  };
+  if (files.csv) {
+    const name = absToRel(files.csv);
+    if (name) items.push(`<a target="_blank" href="/eval/reports/${encodeURIComponent(name)}">CSV</a>`);
+  }
+  if (files.md) {
+    const name = absToRel(files.md);
+    if (name) items.push(`<a target="_blank" href="/eval/reports/${encodeURIComponent(name)}">MD</a>`);
+  }
+  return items.length ? items.join(" · ") : "-";
+}
+
+function renderStats(items) {
+  $("s-total").textContent = items.length;
+  $("s-ret").textContent = items.filter(i => i.experiment_type === "retrieval").length;
+  $("s-gen").textContent = items.filter(i => i.experiment_type === "generation").length;
+  $("s-runs").textContent = items.reduce((s, i) => s + (i.run_count || 0), 0);
+}
+
+function renderTable(items) {
+  const tbody = $("exp-tbody");
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty"><strong>暂无实验</strong>先跑一次 run_retrieval_eval.py 或 run_generation_eval.py，数据就会出现在这里。</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map((it, idx) => {
+    const isSel = state.selectedHash === it.params_hash;
+    const isCmp = state.compareSet.has(it.params_hash);
+    return `<tr class="${isSel ? "selected" : ""} ${isCmp ? "selected" : ""}" data-hash="${it.params_hash}">
+      <td>${idx + 1}</td>
+      <td><span class="hash-code" title="${it.params_hash}">${it.params_hash}</span></td>
+      <td><span class="tag ${it.experiment_type}">${it.experiment_type}</span>
+        ${(it.tags || []).map(t => `<span class="tag">${t}</span>`).join("")}</td>
+      <td>${it.run_count}</td>
+      <td style="white-space:nowrap;">${(it.last_run_at || "").replace("T", " ")}</td>
+    </tr>`;
+  }).join("");
+
+  tbody.querySelectorAll("tr[data-hash]").forEach(tr => {
+    tr.addEventListener("click", (e) => {
+      const hash = tr.getAttribute("data-hash");
+      if (state.compareMode) {
+        if (state.compareSet.has(hash)) state.compareSet.delete(hash);
+        else {
+          if (state.compareSet.size >= 4) {
+            alert("对比模式最多勾选 4 个实验");
+            return;
+          }
+          state.compareSet.add(hash);
+        }
+        $("compare-count").textContent = state.compareSet.size;
+        renderTable(state.all);
+        return;
+      }
+      state.selectedHash = hash;
+      renderTable(state.all);
+      showDetail(hash);
+    });
+  });
+}
+
+function metricCandidates(items) {
+  // 从所有聚合指标里取最常见的 8~12 个用于趋势图
+  const counts = new Map();
+  for (const it of items) {
+    for (const k of Object.keys(it.aggregated_metrics || {})) {
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]).slice(0, 10);
+}
+
+function renderTrend(items) {
+  const metrics = metricCandidates(items);
+  // 按 last_run_at 升序排（时间从左到右）
+  const sorted = [...items].sort((a, b) => (a.last_run_at || "").localeCompare(b.last_run_at || ""));
+  const labels = sorted.map(i => shortHash(i.params_hash) + "\n" + (i.last_run_at || "").slice(5, 16).replace("T", " "));
+  const datasets = metrics.map((metric, mi) => {
+    const palette = ["#6366f1","#22d3ee","#22c55e","#f59e0b","#ef4444","#ec4899","#14b8a6","#a855f7","#f97316","#84cc16"];
+    return {
+      label: metric,
+      data: sorted.map(i => {
+        const v = (i.aggregated_metrics || {})[metric];
+        return v && typeof v.avg === "number" ? v.avg : null;
+      }),
+      borderColor: palette[mi % palette.length],
+      backgroundColor: palette[mi % palette.length] + "22",
+      tension: 0.28,
+      spanGaps: true,
+      pointRadius: 3,
+      borderWidth: 2,
+    };
+  });
+  if (trendChart) trendChart.destroy();
+  const ctx = $("trend-chart").getContext("2d");
+  trendChart = new Chart(ctx, {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "nearest", intersect: false },
+      plugins: {
+        legend: { labels: { color: "#cbd5e1", font: { size: 11 }, boxWidth: 10 } },
+        tooltip: { backgroundColor: "#111827", borderColor: "#374151", borderWidth: 1 },
+      },
+      scales: {
+        x: { ticks: { color: "#94a3b8", font: { size: 10 } }, grid: { color: "rgba(148,163,184,0.06)" } },
+        y: { ticks: { color: "#94a3b8", font: { size: 11 } }, grid: { color: "rgba(148,163,184,0.08)" }, min: 0, suggestedMax: 1 },
+      },
+    },
+  });
+}
+
+async function showDetail(hash) {
+  $("compare-content").style.display = "none";
+  try {
+    const it = await fetchExperiment(hash);
+    $("detail-empty").style.display = "none";
+    $("detail-content").style.display = "block";
+    $("detail-hash").style.display = "inline-block";
+    $("detail-hash").textContent = "hash: " + it.params_hash;
+
+    const runs = (it.runs || []).sort((a, b) => (b.run_at || "").localeCompare(a.run_at || ""));
+    const lastRun = runs[0] || {};
+    const typeTag = `<span class="tag ${it.experiment_type}">${it.experiment_type}</span>`;
+    const tags = (it.tags || []).map(t => `<span class="tag">${t}</span>`).join("");
+    $("detail-meta").innerHTML = `
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        ${typeTag} ${tags}
+        <span class="pill">${runs.length} 次 run</span>
+        <span class="pill">首跑：${(it.first_run_at || "").replace("T"," ")}</span>
+        <span class="pill">最近：${(it.last_run_at || "").replace("T"," ")}</span>
+      </div>
+      ${it.notes ? `<div style="font-size:13px;color:#cbd5e1;padding:8px 12px;background:rgba(99,102,241,0.08);border-left:3px solid var(--accent);border-radius:4px;">📝 备注：${it.notes}</div>` : ""}
+    `;
+
+    // 聚合指标
+    const agg = it.aggregated_metrics || {};
+    const keys = Object.keys(agg);
+    $("detail-metrics").innerHTML = keys.length ? keys.map(k => {
+      const a = agg[k] || {};
+      return `<div class="metric-chip">
+        <span class="k">${k}</span>
+        <span class="v">${fmtNum(a.avg, 3)}</span>
+        <span class="s">σ=${fmtNum(a.std, 3)}  n=${a.count || 0}</span>
+      </div>`;
+    }).join("") : `<div style="color:var(--text-dim); font-size:13px;">（暂无聚合指标，至少需要 1 次 run）</div>`;
+
+    // 参数 JSON
+    $("detail-params").textContent = JSON.stringify(it.params || {}, null, 2);
+
+    // runs
+    $("detail-runs").innerHTML = runs.slice(0, 10).map(r => `
+      <tr>
+        <td><span class="hash-code" title="${r.run_id}">${shortRunId(r.run_id)}</span></td>
+        <td style="white-space:nowrap;">${(r.run_at || "").replace("T"," ")}</td>
+        <td>${fmtNum(r.duration_sec, 1)}s</td>
+        <td>${r.sample_count || 0}</td>
+        <td>${reportFileLink(r.report_files)}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="5" style="text-align:center; color:var(--text-dim); padding:20px;">暂无 runs 记录</td></tr>`;
+  } catch (e) {
+    $("detail-empty").style.display = "block";
+    $("detail-empty").innerHTML = `<strong>❌ 加载失败</strong>${e.message || e}`;
+    $("detail-content").style.display = "none";
+  }
+}
+
+async function doCompare() {
+  const hashes = [...state.compareSet];
+  if (hashes.length < 2) {
+    alert("请至少勾选 2 个实验");
+    return;
+  }
+  try {
+    const rows = await fetchCompare(hashes);
+    if (!rows.length) { alert("未加载到对比数据"); return; }
+
+    $("detail-empty").style.display = "none";
+    $("detail-content").style.display = "none";
+    $("compare-content").style.display = "block";
+    $("detail-hash").style.display = "inline-block";
+    $("detail-hash").textContent = "对比 " + hashes.length + " 个实验";
+
+    // 摘要
+    $("compare-summary").innerHTML = `
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${rows.map(r => `<div style="padding:8px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg-soft);">
+          <span class="hash-code">${r.params_hash}</span>
+          <span class="tag ${r.experiment_type}" style="margin-left:6px;">${r.experiment_type}</span>
+          <span class="pill" style="margin-left:6px;">${r.run_count || 0} runs</span>
+        </div>`).join("")}
+      </div>`;
+
+    // 取公共指标
+    const metricNames = new Set();
+    for (const r of rows) {
+      for (const k of Object.keys(r)) {
+        if (k.endsWith("_avg")) metricNames.add(k.replace(/_avg$/, ""));
+      }
+    }
+    const mNames = [...metricNames];
+
+    // 雷达图
+    const base = rows[0];
+    const palette = ["#6366f1","#22d3ee","#22c55e","#f59e0b"];
+    const datasets = rows.map((r, i) => ({
+      label: r.params_hash.slice(0, 8),
+      data: mNames.map(m => {
+        const v = r[m + "_avg"];
+        return typeof v === "number" ? v : null;
+      }),
+      backgroundColor: palette[i % palette.length] + "33",
+      borderColor: palette[i % palette.length],
+      pointBackgroundColor: palette[i % palette.length],
+      borderWidth: 2,
+    }));
+    if (compareChart) compareChart.destroy();
+    compareChart = new Chart($("compare-chart").getContext("2d"), {
+      type: "radar",
+      data: { labels: mNames, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: "#cbd5e1", font: { size: 11 } } } },
+        scales: {
+          r: {
+            angleLines: { color: "rgba(148,163,184,0.15)" },
+            grid: { color: "rgba(148,163,184,0.15)" },
+            pointLabels: { color: "#cbd5e1", font: { size: 11 } },
+            ticks: { color: "#64748b", backdropColor: "transparent", font: { size: 9 } },
+            suggestedMin: 0, suggestedMax: 1,
+          },
+        },
+      },
+    });
+
+    // 对照表：Δ% 相对于 rows[0]
+    const thead = `<tr><th>指标</th>${rows.map(r => `<th>${shortHash(r.params_hash)}</th>`).join("")}</tr>`;
+    const baseVals = rows[0];
+    const tbody = mNames.map(m => {
+      const baseV = baseVals[m + "_avg"];
+      const baseVn = typeof baseV === "number" ? baseV : NaN;
+      const cells = rows.map(r => {
+        const v = r[m + "_avg"];
+        const std = r[m + "_std"];
+        if (typeof v !== "number") return `<td>-</td>`;
+        let deltaHtml = "";
+        if (!Number.isNaN(baseVn) && baseVn !== 0 && r !== rows[0]) {
+          const deltaPct = ((v - baseVn) / Math.abs(baseVn)) * 100;
+          const cls = deltaPct > 0.05 ? "delta-up" : deltaPct < -0.05 ? "delta-down" : "delta-flat";
+          const sym = deltaPct > 0 ? "+" : "";
+          deltaHtml = `<div class="${cls}" style="font-size:11px;">${sym}${deltaPct.toFixed(1)}%</div>`;
+        }
+        return `<td><div style="font-weight:600;">${fmtNum(v, 3)}</div>
+          ${typeof std === "number" ? `<div style="font-size:10px;color:var(--text-dim);">σ=${fmtNum(std,3)}</div>` : ""}
+          ${deltaHtml}</td>`;
+      }).join("");
+      return `<tr><td style="font-weight:600;">${m}</td>${cells}</tr>`;
+    }).join("");
+    const ct = $("compare-table");
+    ct.querySelector("thead").innerHTML = thead;
+    ct.querySelector("tbody").innerHTML = tbody;
+
+  } catch (e) {
+    alert("对比失败：" + (e.message || e));
+  }
+}
+
+async function refreshAll() {
+  try {
+    $("exp-tbody").innerHTML = `<tr><td colspan="5" class="empty"><strong>加载中...</strong> 请稍候</td></tr>`;
+    const items = await fetchExperiments();
+    state.all = items;
+    renderStats(items);
+    renderTable(items);
+    renderTrend(items);
+    if (!state.compareMode) {
+      if (state.selectedHash) showDetail(state.selectedHash).catch(() => {});
+    }
+  } catch (e) {
+    $("exp-tbody").innerHTML = `<tr><td colspan="5" class="empty"><strong>❌ 加载失败</strong>${e.message || e}<br>请确认后端服务已启动且 eval/ 模块可导入。</td></tr>`;
+  }
+}
+
+// 事件绑定
+$("btn-refresh").addEventListener("click", refreshAll);
+$("filter-type").addEventListener("change", refreshAll);
+$("filter-limit").addEventListener("change", refreshAll);
+$("btn-export").addEventListener("click", () => {
+  window.open("/api/eval/export", "_blank");
+});
+$("btn-compare-mode").addEventListener("click", () => {
+  state.compareMode = !state.compareMode;
+  state.compareSet.clear();
+  $("compare-tip").style.display = state.compareMode ? "block" : "none";
+  $("compare-count").textContent = 0;
+  $("btn-compare-mode").classList.toggle("active", state.compareMode);
+  if (!state.compareMode) {
+    $("compare-content").style.display = "none";
+  }
+  renderTable(state.all);
+});
+$("btn-do-compare").addEventListener("click", doCompare);
+$("btn-compare-clear").addEventListener("click", () => {
+  state.compareSet.clear();
+  $("compare-count").textContent = 0;
+  renderTable(state.all);
+});
+
+// 启动
+refreshAll();
+</script>
+</body>
+</html>

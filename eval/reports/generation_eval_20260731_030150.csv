@@ -1,0 +1,34 @@
+﻿id,question,answer,context_count,retrieval_evidence_count,context_included_count,context_used_tokens,retrieval_hit,query_intent,top3_sources,elapsed_seconds,answer_relevancy,answer_relevancy_status,answer_relevancy_reason,context_precision,context_precision_status,context_precision_reason,faithfulness,faithfulness_status,faithfulness_reason
+table-001,王刚2026年3月个税扣多少？,"王刚2026年3月个税为3834.25元。
+
+相关工资信息：王刚，工号EMP009，技术部架构师；2026年3月应发工资39969元，社保个人4196元，公积金个人4796元，实发工资27142.75元。
+
+（注：以上内容仅供参考，具体执行以公司 HR 部门正式文件为准）",1,1,1,87,✓,general_query,员工工资表_2026年3月.xlsx,5.33,0.8284,PASS,RAGAS 官方指标,1.0,PASS,RAGAS 官方指标,0.7778,PASS,RAGAS 官方指标
+table-002,龚一诺2026年1月社保公积金合计多少？,"龚一诺2026年1月社保公积金个人部分合计为8646元。
+
+关键事实：
+- 社保（个人）：4035元
+- 公积金（个人）：4611元
+- 合计：4035 + 4611 = 8646元
+
+该结果仅基于2026年1月工资表中龚一诺的个人社保和个人公积金数据。
+
+（注：以上内容仅供参考，具体执行以公司 HR 部门正式文件为准）",1,1,1,88,✓,general_query,员工工资表_2026年1月.xlsx,6.41,0.9612,PASS,RAGAS 官方指标,0.0,PASS,RAGAS 官方指标,0.5556,PASS,RAGAS 官方指标
+table-003,2026年5月龚一诺的应发工资组成,"龚一诺2026年5月应发工资为42746元，组成如下：
+
+- 基本工资：27800元
+- 岗位津贴：4687元
+- 绩效工资：8019元
+- 加班费：1940元
+- 全勤奖：300元
+
+以上项目合计为应发工资42746元。资料同时列明其个人社保4488元、公积金个人5129元、个税4372.25元，实发工资为28756.75元。
+
+（注：以上内容仅供参考，具体执行以公司 HR 部门正式文件为准）",1,1,1,89,✓,general_query,员工工资表_2026年5月.xlsx,5.66,0.0,PASS,RAGAS 官方指标,1.0,PASS,RAGAS 官方指标,0.8462,PASS,RAGAS 官方指标
+table-004,2025年营业收入是多少？,"资料不足，无法基于当前知识库回答该问题。
+
+（注：财务数据来自历史报表，最新情况以财务部口径为准）",4,4,4,290,✓,unknown,财务报表.pdf:p3; 财务报表.pdf:p1; 财务报表.pdf:p4,66.12,0.0,PASS,RAGAS 官方指标,0.0,PASS,RAGAS 官方指标,0.25,PASS,RAGAS 官方指标
+,,,,,,,,,,,,,,,,,,,
+AVERAGE,,,,,,,,,,,0.4474,,,0.5,,,0.6074,,
+,,,,,,,,,,,,,,,,,,,
+CONFIG,"{""parser_version"": ""2.4"", ""chunk_size"": 200, ""chunk_overlap"": 20, ""top_k"": 4, ""ks"": ""1,3,5"", ""eval_pipeline"": ""EnterpriseQueryService.retrieve_only"", ""retrieval_mode"": ""hybrid"", ""vector_top_k"": 40, ""bm25_top_k"": 40, ""fusion_top_k"": 50, ""final_top_k"": 4, ""rerank_enabled"": ""true"", ""min_score"": 0.3, ""embedding_model"": ""qwen3.7-text-embedding"", ""collection_name"": ""agent"", ""evaluation_mode"": ""ragas"", ""metrics"": ""answer_relevancy, context_precision, faithfulness"", ""sample_count"": 4, ""generation_time_seconds"": 83.5, ""judge_time_seconds"": 77.3, ""total_time_seconds"": 164.0, ""llm_model"": ""gpt-5.5"", ""llm_model_chat"": ""gpt-5.5"", ""llm_model_judge"": ""qwen-plus"", ""llm_judge_n"": 1, ""llm_judge_base_url"": ""https://dashscope.aliyuncs.com/compatible-mode/v1"", ""embedding_model_name"": ""qwen3.7-text-embedding"", ""reference_sensitive_metrics"": ""<none>"", ""evaluation_method"": ""RAGAS 官方指标""}",,,,,,,,,,,,,,,,,,

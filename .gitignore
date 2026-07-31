@@ -1,0 +1,68 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.pyo
+
+# ---- Virtual environments ----
+.venv/
+venv/
+ENV/
+env/
+
+# ---- IDEs / OS ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Environment & secrets ----
+.env
+.env.local
+.env.*.local
+web/.env
+
+# ---- Logs ----
+logs/
+*.log
+
+# ---- RAG runtime artifacts ----
+# Chroma vector DB (root and under data/)
+chroma_db/
+data/chroma_db/
+# Document registry SQLite
+data/rag_document_registry.sqlite3
+# BM25 index
+data/bm25_index.pkl
+
+# ---- Source documents / uploads (keep local only) ----
+data/*.pdf
+data/*.docx
+data/*.doc
+data/*.xlsx
+data/*.xls
+data/*.pptx
+data/*.csv
+data/*.md
+!data/.gitkeep
+
+# ---- Frontend (Vite/React) ----
+web/node_modules/
+web/dist/
+web/dist-ssr/
+web/*.local
